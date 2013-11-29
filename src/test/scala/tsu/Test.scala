@@ -14,6 +14,6 @@ class Test extends FlatSpec with Matchers {
         fields.take(2).foreach(println)
       }
     }
-
   }
+
 }
