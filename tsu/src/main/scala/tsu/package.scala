@@ -66,7 +66,7 @@ package object tsu {
   }
 
   private def traverse(v: JsonValue): Unit = v match {
-    case JsonObject(fields) => fields.foreach(f => traverse(f.value))
+    case JsonObject(fields) => fields.map(_.value).foreach(traverse)
     case JsonArray(values) => values.foreach(traverse)
     case _ => Unit
   }
@@ -87,4 +87,56 @@ package object tsu {
       })
     }
   }
+
+
+  abstract class Query[A] extends Function[JsonValue, Stream[A]]{
+    def apply(v: JsonValue): Stream[A]
+  }
+
+  implicit class QueryChain[A <: JsonValue](q: Query[A]) {
+    def ->(q2: Query[A]): Query[A] = new Query[A] {
+      def apply(v: JsonValue): Stream[A] = q(v).flatMap(q2)
+    }
+  }
+
+  object Query {
+    implicit class JsonValueQuery(v: JsonValue) {
+      def query[A](q: Query[A]): Stream[A] = q(v)
+    }
+
+    class StructureMismatch extends Exception
+
+    def constant[T](t: T): Query[T] = new Query[T] {
+      def apply(v: JsonValue): Stream[T] = Stream(t)
+    }
+
+    def filter(f: JsonValue => Boolean): Query[JsonValue] = new Query[JsonValue] {
+      def apply(v: JsonValue): Stream[JsonValue] = if(f(v)) Stream(v) else Stream()
+    }
+
+    def eq(i: BigDecimal) = filter(_.asInstanceOf[JsonNumber].value == i)
+    def eq(s: String) = filter(_.asInstanceOf[JsonString].value == s)
+    def eq(b: Boolean) = filter(_.asInstanceOf[JsonBoolean].value == b)
+    def isNull = filter(_ match { case JsonNull => true; case _ => false })
+
+    def field(key: String): Query[JsonValue] = new Query[JsonValue] {
+      def apply(v: JsonValue): Stream[JsonValue] = v match {
+        case JsonObject(fields) => fields.filter(_.key == key).take(1).map(_.value)
+        case _ => throw new StructureMismatch
+      }
+    }
+
+    def where[A](q: Query[A]): Query[JsonValue] = new Query[JsonValue] {
+      def apply(v: JsonValue): Stream[JsonValue] = q(v).take(1).map(_ => v)
+    }
+
+    def select[A](q: Query[A]) : Query[A] = new Query[A] {
+      def apply(v: JsonValue): Stream[A] = v match {
+        case JsonArray(values) => values.flatMap(q)
+        case _ => throw new StructureMismatch
+      }
+    }
+  }
+
+
 }
