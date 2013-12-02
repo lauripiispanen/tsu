@@ -28,6 +28,7 @@
     <modules>
         <module>tsu</module>
         <module>tsu-argonaut</module>
+        <module>tsu-jackson</module>
     </modules>
 
     <build>

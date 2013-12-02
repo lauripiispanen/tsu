@@ -1,5 +1,6 @@
-package tsu
+package tsu.jackson
 
+import tsu._
 import org.scalatest._
 import java.io.InputStream
 import scala.io.Source
@@ -20,14 +21,11 @@ class Test extends FlatSpec with Matchers {
   "Query" should "return" in {
     import Query._
 
-    def idEq(i: BigDecimal) = field("id") -> Query.eq(i)
-
     val inputStream: InputStream = this.getClass.getResourceAsStream("/test_first_two_objects.json")
-    val objects: Stream[JsonObject] =
+    val array: JsonArray =
       parse(Source.fromInputStream(inputStream, "UTF-8"))
-      .query(select(where(idEq(0))))
-      .map(_.asInstanceOf[JsonObject])
+      .query(filter(\("id") > Query.eq(0)) > map(\("id")))
 
-    assert(objects.head.fields.filter(_.key == "id").head.value.asInstanceOf[JsonNumber].value == 0)
+    assert(array.contents.head.asInstanceOf[JsonNumber].value == 0)
   }
 }
