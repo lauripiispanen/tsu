@@ -18,54 +18,63 @@ package object tsu {
 
   abstract class Query[-A, +B] extends Function[A, B]{
     def apply(v: A): B
-  }
-
-  implicit class QueryComposition[A, B](q: Query[A, B]) {
-    def >[C](q2: Query[B, C]): Query[A, C] = new Query[A, C] {
-      def apply(v: A): C = q2(q(v))
+    def |>[C](q2: Query[B, C]) = new Query[A, C] {
+      def apply(v: A): C = q2(Query.this(v))
     }
   }
 
   object Query {
-    implicit class JsonValueQuery(v: JsonValue) {
-      def query[A](q: Query[JsonValue, A]): A = q(v)
+    implicit class QueryableJsonValue(v: JsonValue) {
+      def query[A](q: JsonValue => A): A = q(v)
+      def \==(i: BigDecimal) = v.asInstanceOf[JsonNumber].value == i
+      def \==(i: String) = v.asInstanceOf[JsonString].value == i
+      def \==(i: Boolean) = v.asInstanceOf[JsonBoolean].value == i
+      def isNull = v match { case JsonNull => true; case _ => false}
+      def \(key: String) = v.asInstanceOf[JsonObject].fields.filter(_.key == key).head.value
+      def map(f: JsonValue => JsonValue) = Query.map(f)(v)
+      def filter(f: JsonValue => Boolean) = Query.filter(f)(v)
+      def contents = Query.contents(v)
+      def flatten = Query.flatten(v)
     }
 
-    class StructureMismatch extends Exception
-
-    def map(f : JsonValue => JsonValue) = new Query[JsonArray, JsonArray] {
-      def apply(v: JsonArray): JsonArray = JsonArray(v.contents.map(f))
+    def map(f: JsonValue => JsonValue) = new Query[JsonValue, JsonArray] {
+      def apply(v: JsonValue): JsonArray = JsonArray(v.asInstanceOf[JsonArray].contents.map(f))
     }
 
-    def filter(f : JsonValue => Boolean) = new Query[JsonValue, JsonArray] {
+    def filter(f: JsonValue => Boolean) = new Query[JsonValue, JsonArray] {
       def apply(v: JsonValue): JsonArray = JsonArray(v.asInstanceOf[JsonArray].contents.filter(f))
+    }
+
+    def contents = new Query[JsonValue, Stream[JsonValue]] {
+      def apply(v: JsonValue): Stream[JsonValue] = v.asInstanceOf[JsonArray].contents
+    }
+
+    def flatten = new Query[JsonValue, JsonArray] {
+      def apply(v: JsonValue): JsonArray = JsonArray(v.asInstanceOf[JsonArray].contents.flatMap(_.asInstanceOf[JsonArray].contents))
     }
 
     def constant[T](t: T) = new Query[JsonValue, T] {
       def apply(v: JsonValue): T = t
     }
 
-    def eq(i: BigDecimal) = new Query[JsonValue, Boolean] {
-      def apply(v: JsonValue): Boolean = v.asInstanceOf[JsonNumber].value == i
+    implicit def \(key: String) = new JsonValueQuery[JsonValue] {
+      def apply(v: JsonValue): JsonValue = v \ key
     }
 
-    def eq(i: String) = new Query[JsonValue, Boolean] {
-      def apply(v: JsonValue): Boolean = v.asInstanceOf[JsonString].value == i
+    abstract class JsonValueQuery[A] extends Query[A, JsonValue]{
+      def \==(i: BigDecimal) = new Query[A, Boolean] {
+        def apply(v: A) = JsonValueQuery.this(v) \== i
+      }
+      def \==(i: String) = new Query[A, Boolean] {
+        def apply(v: A) = JsonValueQuery.this(v) \== i
+      }
+      def \==(i: Boolean) = new Query[A, Boolean] {
+        def apply(v: A) = JsonValueQuery.this(v) \== i
+      }
+      def isNull = new Query[A, Boolean] {
+        def apply(v: A) = JsonValueQuery.this(v) isNull
+      }
     }
 
-    def eq(i: Boolean) = new Query[JsonValue, Boolean] {
-      def apply(v: JsonValue): Boolean = v.asInstanceOf[JsonBoolean].value == i
-    }
-
-    def isNull = new Query[JsonValue, Boolean] {
-      def apply(v: JsonValue): Boolean = v match { case JsonNull => true; case _ => false }
-    }
-
-    implicit def \(key: String) = new Query[JsonValue, JsonValue] {
-      def apply(v: JsonValue): JsonValue = v.asInstanceOf[JsonObject].fields.filter(_.key == key).head.value
-    }
-    
   }
-
-
 }

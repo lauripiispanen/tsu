@@ -21,11 +21,13 @@ class Test extends FlatSpec with Matchers {
   "Query" should "return" in {
     import Query._
 
+    val zeroIds: JsonValue => Stream[JsonValue] = filter("id" \== 0) |> map("id") |> contents
+    
     val inputStream: InputStream = this.getClass.getResourceAsStream("/test_first_two_objects.json")
-    val array: JsonArray =
+    val values: Stream[JsonValue] =
       parse(Source.fromInputStream(inputStream, "UTF-8"))
-      .query(filter(\("id") > Query.eq(0)) > map(\("id")))
+      .query(zeroIds)
 
-    assert(array.contents.head.asInstanceOf[JsonNumber].value == 0)
+    assert(values.head.asInstanceOf[JsonNumber].value == 0)
   }
 }
