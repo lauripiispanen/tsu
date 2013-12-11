@@ -1,0 +1,103 @@
+[
+    {
+        "id": 0,
+        "name": "Whitfield Montgomery",
+        "gender": "male",
+        "company": "Plexia",
+        "friends": [
+            {
+                "id": 0,
+                "name": "Janis Morin"
+            },
+            {
+                "id": 1,
+                "name": "Madeline Klein"
+            },
+            {
+                "id": 2,
+                "name": "Mildred Caldwell"
+            }
+        ]
+    },
+    {
+        "id": 1,
+        "name": "Bolton Nunez",
+        "gender": "male",
+        "company": "Golistic",
+        "friends": [
+            {
+                "id": 0,
+                "name": "Ferrell Santana"
+            },
+            {
+                "id": 1,
+                "name": "Alana Carpenter"
+            },
+            {
+                "id": 2,
+                "name": "Baird Norris"
+            }
+        ]
+    },
+    {
+        "id": 2,
+        "name": "Deana Holder",
+        "gender": "female",
+        "company": "Gology",
+        "friends": [
+            {
+                "id": 0,
+                "name": "Lola Wilkinson"
+            },
+            {
+                "id": 1,
+                "name": "Chris Massey"
+            },
+            {
+                "id": 2,
+                "name": "Bonner Sykes"
+            }
+        ]
+    },
+    {
+        "id": 3,
+        "name": "Malinda Osborne",
+        "gender": "female",
+        "company": "Musix",
+        "friends": [
+            {
+                "id": 0,
+                "name": "Adeline Mays"
+            },
+            {
+                "id": 1,
+                "name": "Rena Morse"
+            },
+            {
+                "id": 2,
+                "name": "Annie Brewer"
+            }
+        ]
+    },
+    {
+        "id": 4,
+        "name": "Gamble Garza",
+        "gender": "male",
+        "company": "Toyletry",
+        "friends": [
+            {
+                "id": 0,
+                "name": "Diane Barber"
+            },
+            {
+                "id": 1,
+                "name": "Laurel Cruz"
+            },
+            {
+                "id": 2,
+                "name": "Daniel Alexander"
+            }
+        ]
+    },
+    {
+        "id": 5
