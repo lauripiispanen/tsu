@@ -47,6 +47,28 @@ lazy val `tsu-argonaut` =
       )
     )
 
+lazy val `tsu-spray` =
+  project
+    .in(file("tsu-spray"))
+    .dependsOn(tsu)
+    .settings(
+      version := "1-SNAPSHOT",
+      libraryDependencies ++= Seq(
+        "io.spray" %% "spray-json" % "1.2.5"
+      )
+    )
+lazy val `tsu-json4s` =
+  project
+    .in(file("tsu-json4s"))
+    .dependsOn(tsu)
+    .settings(
+      version := "1-SNAPSHOT",
+      libraryDependencies ++= Seq(
+        "org.json4s" %% "json4s-ast" % "3.2.7",
+        "org.json4s" %% "json4s-core" % "3.2.7"
+      )
+    )
+
 lazy val `tsu-jackson` =
   project
     .in(file("tsu-jackson"))

@@ -5,37 +5,32 @@ import scala.util.parsing.input.Position
 package object parser {
 import scala.util.parsing.input.Reader
 
-
   abstract class JsonParser[+T] {
-    def apply(allowedWhitespace: Int): Reader[Char] => Stream[T] = { in =>
+    def apply(allowedWhitespace: Int): Reader[Char] => Stream[T] = r => parse(new TsuParser(allowedWhitespace))(new Rd(r))
+
+    private def parse(tsuParser: TsuParser): Reader[Either[TsuParser.NoSuccess, Char]] => Stream[T] = { in =>
       if(in.atEnd) {
         End
       } else {
-        apply(new TsuParser(allowedWhitespace))(wrap(in)) match {
-          case s: TsuParser.Success[T] => Next(s.result, End)
+        apply(tsuParser)(in) match {
+          case s: TsuParser.Success[T] => Next(s.result, parse(tsuParser)(s.next))
           case n: TsuParser.NoSuccess => Error(n.toString)
         }
       }
     }
 
-    private def wrap(r: Reader[Char]) = new Rd(r)
-
-    class Rd(r: Reader[Char]) extends Reader[Either[TsuParser.NoSuccess, Char]] {
+    private class Rd(r: Reader[Char]) extends Reader[Either[TsuParser.NoSuccess, Char]] {
       override def atEnd: Boolean = r.atEnd
-
       override def pos: Position = r.pos
-
       override def rest: Reader[Either[TsuParser.NoSuccess, Char]] = new Rd(r.rest)
-
       override def first: Either[TsuParser.NoSuccess, Char] = Right(r.first)
     }
 
     protected[parser] def apply(tsuParser: TsuParser): TsuParser.Parser[T]
-
   }
 
   object JsonParser {
-    implicit class ParserParse[+T <: JsonValue](p: JsonParser[T]) {
+    implicit class ParserConfiguration[+T <: JsonValue](p: JsonParser[T]) {
       def allowWhitespace(i: Int): Reader[Char] => Stream[T] = p(i)
     }
     implicit class JsonParserCombinations[T <: JsonValue](p1: JsonParser[T]) {
@@ -48,10 +43,6 @@ import scala.util.parsing.input.Reader
     }
   }
 
-  private def wrap[T <: JsonValue](f: TsuParser => TsuParser.Parser[T]): JsonParser[T] = new JsonParser[T] {
-    def apply(tsuParser: TsuParser): TsuParser.Parser[T] = f(tsuParser)
-  }
-
   implicit def stringAndValueParserTuple2FieldParser[T <: JsonValue](p: (JsonParser[JsonString], JsonParser[T])): JsonParser[Member] = new JsonParser[Member] {
     def apply(tsuParser: TsuParser): TsuParser.Parser[Member] = tsuParser.pair(p._1(tsuParser), p._2(tsuParser))
   }
@@ -62,6 +53,10 @@ import scala.util.parsing.input.Reader
   implicit def stringStringTuple2FieldParser(t: (String, String)): JsonParser[Member] =
     stringParserTuple2FieldParser((t._1, string(t._2)))
 
+  private def wrap[T <: JsonValue](f: TsuParser => TsuParser.Parser[T]): JsonParser[T] = new JsonParser[T] {
+    def apply(tsuParser: TsuParser): TsuParser.Parser[T] = f(tsuParser)
+  }
+
   def `null`: JsonParser[JsonNull.type] = wrap(_.`null`)
   def boolean: JsonParser[JsonBoolean] = wrap(_.boolean)
   def boolean(b: Boolean): JsonParser[JsonBoolean] = wrap(_.boolean(b))
@@ -71,16 +66,16 @@ import scala.util.parsing.input.Reader
   def array(maxLen: Int = 0, p: JsonParser[JsonValue]) = wrap(tsuParser => tsuParser.array(maxLen, p(tsuParser)))
   def `object`(ps: JsonParser[Member]*) = wrap(tsuParser => tsuParser.`object`(ps.map(_(tsuParser)):_*))
 
-  class ParseError(msg: String) extends Exception(msg)
 
   import scala.util.parsing.combinator.{ImplicitConversions, Parsers}
 
   protected object TsuParser extends Parsers with ImplicitConversions {
+    import scala.collection.immutable.Stream.range
 
     type Elem = Either[NoSuccess, Char]
 
-    private val hexDigits = Set[Char]() ++ "0123456789abcdefABCDEF".toArray
-    private val controlCharacters = List[Char]('\"','\\',0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,127)
+    private val hexDigits = "0123456789abcdefABCDEF".toSet
+    private val controlCharacters = "\"\\".toSet ++ range(0, 31).map(_.toChar)
 
     implicit def accept(e: Char): Parser[Elem] = accept(Right(e))
 
@@ -88,38 +83,41 @@ import scala.util.parsing.input.Reader
       = new Parser[T]{ def apply(in: Input) = if(in.first.isRight) f(in) else in.first.left.get }
 
     def char = {
-      def chrExcept(cs: Char*) = elem("", _.right.toOption.map(ch => cs forall (ch != _)).getOrElse(false))
+      def allowedCharacter = elem("", _.right.toOption.map(c => !controlCharacters.contains(c)).getOrElse(false))
 
-      def charEsc: Parser[Elem] =
-        ('\\' ~> '\"'
-          |'\\' ~> '\\'
-          |'\\' ~> '/'
-          |'\\' ~> 'b' ^^^ Right('\b')
-          |'\\' ~> 'f' ^^^ Right('\f')
-          |'\\' ~> 'n' ^^^ Right('\n')
-          |'\\' ~> 'r' ^^^ Right('\r')
-          |'\\' ~> 't' ^^^ Right('\t')
-          |'\\' ~> 'u' ~> unicodeBlock)
+      def hexDigit: Parser[Elem] = elem("hex digit", _.right.toOption.map(hexDigits.contains).getOrElse(false))
 
-      def hexDigit: Parser[Elem] = elem("hex digit", e => hexDigits.map(c => Right[NoSuccess, Char](c): Elem).contains(e))
-
-      def unicodeBlock: Parser[Elem] = hexDigit ~ hexDigit ~ hexDigit ~ hexDigit ^^ {
+      def codePoint: Parser[Elem] = hexDigit ~ hexDigit ~ hexDigit ~ hexDigit ^^ {
         case Right(a) ~ Right(b) ~ Right(c) ~ Right(d) =>
           Right(Integer.parseInt(List(a, b, c, d) mkString "", 16).toChar)
       }
 
-      chrExcept(controlCharacters:_*) | charEsc
+      def characterEscape: Parser[Elem] =
+        '\\' ~> '\"'                |
+        '\\' ~> '\\'                |
+        '\\' ~> '/'                 |
+        '\\' ~> 'b' ^^^ Right('\b') |
+        '\\' ~> 'f' ^^^ Right('\f') |
+        '\\' ~> 'n' ^^^ Right('\n') |
+        '\\' ~> 'r' ^^^ Right('\r') |
+        '\\' ~> 't' ^^^ Right('\t') |
+        '\\' ~> 'u' ~> codePoint
+
+      allowedCharacter | characterEscape
     }
 
+    private val whitespaceCharacters = "\t\n\r ".toSet
+
     def whitespace(n: Int): Parser[Unit] = {
-      def whitespaceChar = elem("space char", _.right.toOption.map(_ <= ' ').getOrElse(false))
+      def whitespaceChar = {
+        elem("whitespace char", _.right.toOption.map(whitespaceCharacters.contains).getOrElse(false))
+      }
 
       if (n < 0)
         err("Maximum allowed whitespace exceeded")
       else
         whitespaceChar ~> whitespace(n - 1) | success(Unit)
     }
-
 
     def number(i: Int, f: Int, e: Int) = {
       def digit = elem("digit", _.right.toOption.map(_.isDigit).getOrElse(false))

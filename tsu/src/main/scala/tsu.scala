@@ -1,3 +1,5 @@
+import scala.annotation.tailrec
+
 package object tsu {
 
   sealed abstract class JsonValue
@@ -17,37 +19,47 @@ package object tsu {
   case object JsonNull extends JsonValue
 
   sealed abstract class Stream[+A] {
+
+    class ErrorInStreamException(msg: String) extends Exception(msg)
+
     def toSeq: scala.collection.immutable.Stream[A] = {
       import scala.collection.immutable.Stream.{Cons, Empty}
       this match {
         case a: Next[A] => new Cons(a.value, a.rest.toSeq)
+        case Error(msg) => throw new ErrorInStreamException(msg)
         case End => Empty
       }
     }
 
-    class ErrorInStreamException(msg: String) extends Exception(msg)
-
-    def foreach[B](f: A => Unit): Unit = this match {
-      case Next(v, rest) => {
-        f(v)
-        rest.foreach(f)
+    @tailrec
+    final def foreach[B](f: A => B): Unit ={
+      val result = this match {
+        case Next(value, rest) => {
+          f(value)
+          (true, rest)
+        }
+        case Error(message) => throw new ErrorInStreamException(message)
+        case s => (false, s)
       }
-      case e: Error => throw new ErrorInStreamException(e.message)
-      case End => Unit
+      if(result._1) result._2.foreach(f)
     }
 
     def take(n: Int): Stream[A] = handleTermination { a =>
       if(n <= 0)
         End
+      else if (n == 1)
+        Next(a.value, End)
       else
-        Next(a.value, if(n <= 1) End else a.rest.take(n - 1))
+        Next(a.value, a.rest.take(n - 1))
     }
 
-    def filter(f: A => Boolean): Stream[A] = handleTermination { a =>
-      if(f(a.value))
-        Next(a.value, a.rest.filter(f))
-      else
-        a.rest.filter(f)
+    @tailrec
+    final def filter(f: A => Boolean): Stream[A] = {
+      val result = this match {
+        case n: Next[A] => if(f(n.value)) (true, Next(n.value, Stream.filter(n.rest, f))) else (false, n.rest)
+        case s => (true, s)
+      }
+      if(result._1) result._2 else result._2.filter(f)
     }
 
     def map[B](f: A => B): Stream[B] = handleTermination { a =>
@@ -79,6 +91,16 @@ package object tsu {
 
   object Stream {
     implicit def streamToSeq[A](as: Stream[A]): Seq[A] = as.toSeq
+    implicit def seqToStream[A](as: Seq[A]): Stream[A] = {
+      if(as.isEmpty) {
+        End
+      } else {
+        Next(as.head, seqToStream(as.tail))
+      }
+    }
+    private def filter[A](s: Stream[A], f: A => Boolean): Stream[A] = {
+      s.filter(f)
+    }
   }
 
   object Next {
