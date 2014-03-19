@@ -221,7 +221,7 @@ import scala.util.parsing.input.Reader
           lazy val next = rest match { case s: Success[_] => s.next; case ns: NoSuccess => emptyReader(ns) }
           Success(Next(field, {
             rest match {
-              case s: Success[Stream[Member]] => s.result
+              case Success(result, _) => result
               case n: NoSuccess => tsu.Error(n.toString)
             }
           }), next)
@@ -243,7 +243,7 @@ import scala.util.parsing.input.Reader
           lazy val next = rest match { case s: Success[_] => s.next; case ns: NoSuccess => emptyReader(ns) }
           Success(Next(v, {
             rest match {
-              case s: Success[Stream[JsonValue]] => s.result
+              case Success(result, _) => result
               case n: NoSuccess => tsu.Error(n.toString)
             }
           }), next)
