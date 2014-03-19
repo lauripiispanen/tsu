@@ -8,6 +8,8 @@ libraryDependencies in GlobalScope := Seq(
 
 dependencyOverrides in GlobalScope := Set(
   "org.scala-lang" % "scala-library" % "2.10.3",
+  "org.scala-lang" % "scala-compiler" % "2.10.3",
+  "org.scala-lang" % "scalap" % "2.10.3",
   "org.scala-lang" % "scala-reflect" % "2.10.3"
 )
 
