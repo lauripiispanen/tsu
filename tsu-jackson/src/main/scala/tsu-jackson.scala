@@ -8,26 +8,20 @@ package object jackson {
     parse(new SourceReader(source))
   }
 
-  implicit private def jvalueToNext(jv: JsonValue) = Next(jv, End)
-
   def parse(is: java.io.Reader): Stream[JsonValue] = {
     val parser: JsonParser = new JsonFactory().createParser(is)
 
-    def parseJsonValue(token: => JsonToken): Stream[JsonValue] = {
-      try {
-        token match {
-          case JsonToken.START_OBJECT => JsonObject(parseObject)
-          case JsonToken.START_ARRAY => JsonArray(parseArray)
-          case JsonToken.VALUE_STRING => JsonString(parser.getText)
-          case JsonToken.VALUE_NUMBER_INT => JsonNumber(parser.getDecimalValue)
-          case JsonToken.VALUE_NUMBER_FLOAT => JsonNumber(parser.getDecimalValue)
-          case JsonToken.VALUE_TRUE => JsonBoolean(true)
-          case JsonToken.VALUE_FALSE => JsonBoolean(false)
-          case JsonToken.VALUE_NULL => JsonNull
-          case t => throw new IllegalStateException(t.toString)
-        }
-      } catch {
-        case e: Exception => Error(e.getMessage)
+    def parseJsonValue(token: => JsonToken): JsonValue = {
+      token match {
+        case JsonToken.START_OBJECT => JsonObject(parseObject)
+        case JsonToken.START_ARRAY => JsonArray(parseArray)
+        case JsonToken.VALUE_STRING => JsonString(parser.getText)
+        case JsonToken.VALUE_NUMBER_INT => JsonNumber(parser.getDecimalValue)
+        case JsonToken.VALUE_NUMBER_FLOAT => JsonNumber(parser.getDecimalValue)
+        case JsonToken.VALUE_TRUE => JsonBoolean(true)
+        case JsonToken.VALUE_FALSE => JsonBoolean(false)
+        case JsonToken.VALUE_NULL => JsonNull
+        case t => throw new IllegalStateException(t.toString)
       }
     }
 
@@ -36,8 +30,8 @@ package object jackson {
         parser.nextToken match {
           case JsonToken.FIELD_NAME => {
             val key = parser.getText
-            parseJsonValue(parser.nextToken)
-              .flatMap(v => Next(Member(key, v), { traverse(v); parseObject }))
+            lazy val v = parseJsonValue(parser.nextToken)
+            Next(Member(key, v), { traverse(v); parseObject })
           }
           case JsonToken.END_OBJECT => End
           case t => throw new IllegalStateException(t.toString)
@@ -52,8 +46,8 @@ package object jackson {
         parser.nextToken match {
           case JsonToken.END_ARRAY => End
           case t => {
-            parseJsonValue(t)
-              .flatMap(v => Next(v, { traverse(v); parseArray }))
+            lazy val v = parseJsonValue(t)
+            Next(v, { traverse(v); parseArray })
           }
         }
       } catch {
@@ -61,7 +55,7 @@ package object jackson {
       }
     }
 
-    parseJsonValue(parser.nextToken)
+    Next(parseJsonValue(parser.nextToken), parse(is))
   }
 
   private def traverse(v: JsonValue): Unit = v match {

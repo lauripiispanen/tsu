@@ -1,4 +1,5 @@
 import scala.annotation.tailrec
+import scala.util.Try
 
 package object tsu {
 
@@ -101,10 +102,11 @@ package object tsu {
     private def filter[A](s: Stream[A], f: A => Boolean): Stream[A] = {
       s.filter(f)
     }
+    def apply[A](a: => A): Stream[A] = Try{ Next(a, End) } recover { case t => Error(t.getMessage) } getOrElse Error("Unknown error")
   }
 
   object Next {
-    def apply[A](value: A, r: => Stream[A]) = new Next(value, r)
+    def apply[A](value: => A, r: => Stream[A]): Stream[A] = Try{ new Next(value, r) } recover { case t => Error(t.getMessage) } getOrElse Error("Unknown error")
     def unapply[A](as: Stream[A]): Option[(A, Stream[A])] = {
       if(as.isInstanceOf[Next[A]]) {
         val a = as.asInstanceOf[Next[A]]
@@ -117,10 +119,10 @@ package object tsu {
   }
 
   final class Next[+A](val value: A, r: => Stream[A]) extends Stream[A] {
-    lazy val rest = r
+    lazy val rest: Stream[A] = Try{ r } recover { case t => Error(t.getMessage) } getOrElse Error("Unknown error")
   }
 
-  final case class Error(message: String) extends Stream[Nothing]
+  case class Error(message: String) extends Stream[Nothing]
 
   case object End extends Stream[Nothing]
 }

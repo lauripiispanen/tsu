@@ -1,6 +1,7 @@
 package tsu
 
 import scala.util.parsing.input.Position
+import scala.util.Try
 
 package object parser {
 import scala.util.parsing.input.Reader
@@ -9,14 +10,16 @@ import scala.util.parsing.input.Reader
     def apply(allowedWhitespace: Int): Reader[Char] => Stream[T] = r => parse(new TsuParser(allowedWhitespace))(new Rd(r))
 
     private def parse(tsuParser: TsuParser): Reader[Either[TsuParser.NoSuccess, Char]] => Stream[T] = { in =>
-      if(in.atEnd) {
-        End
-      } else {
-        apply(tsuParser)(in) match {
-          case s: TsuParser.Success[T] => Next(s.result, parse(tsuParser)(s.next))
-          case n: TsuParser.NoSuccess => Error(n.toString)
+      Try {
+        if(in.atEnd) {
+          End
+        } else {
+          apply(tsuParser)(in) match {
+            case s: TsuParser.Success[T] => Next(s.result, parse(tsuParser)(s.next))
+            case n: TsuParser.NoSuccess => Error(n.toString)
+          }
         }
-      }
+      } recover { case t => Error(t.getMessage) } getOrElse Error("Unknown error")
     }
 
     private class Rd(r: Reader[Char]) extends Reader[Either[TsuParser.NoSuccess, Char]] {
