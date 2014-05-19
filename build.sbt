@@ -17,7 +17,9 @@ dependencyOverrides in GlobalScope := Set(
 
 conflictManager in GlobalScope := ConflictManager.strict
 
-resolvers in GlobalScope += "Sonatype" at "https://oss.sonatype.org/content/groups/public"
+resolvers in GlobalScope ++= Seq(
+  "Sonatype" at "https://oss.sonatype.org/content/groups/public"
+)
 
 moduleName := "tsu-project"
 
@@ -63,6 +65,9 @@ lazy val `tsu-spray` =
       version := "1-SNAPSHOT",
       libraryDependencies ++= Seq(
         "io.spray" %% "spray-json" % "1.2.6"
+      ),
+      resolvers ++= Seq(
+        "Spray" at "http://repo.spray.io"
       )
     )
 lazy val `tsu-json4s` =
