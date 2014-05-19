@@ -1,16 +1,18 @@
 organization in GlobalScope := "rhurmala"
 
-scalaVersion in GlobalScope := "2.10.3"
+scalaVersion in GlobalScope := "2.11.0"
+
+crossScalaVersions := Seq("2.10.3", "2.11.0")
 
 libraryDependencies in GlobalScope := Seq(
-  "org.scalatest" %% "scalatest" % "2.0" % "test"
+  "org.scalatest" %% "scalatest" % "2.1.7" % "test"
 )
 
 dependencyOverrides in GlobalScope := Set(
-  "org.scala-lang" % "scala-library" % "2.10.3",
-  "org.scala-lang" % "scala-compiler" % "2.10.3",
-  "org.scala-lang" % "scalap" % "2.10.3",
-  "org.scala-lang" % "scala-reflect" % "2.10.3"
+  "org.scala-lang" % "scala-library" % scalaVersion.value,
+  "org.scala-lang" % "scala-compiler" % scalaVersion.value,
+  "org.scala-lang" % "scalap" % scalaVersion.value,
+  "org.scala-lang" % "scala-reflect" % scalaVersion.value
 )
 
 conflictManager in GlobalScope := ConflictManager.strict
@@ -35,7 +37,11 @@ lazy val `tsu-parser` =
     .in(file("tsu-parser"))
     .dependsOn(tsu)
     .settings(
-      version := "1-SNAPSHOT"
+      version := "1-SNAPSHOT",
+      libraryDependencies <++= scalaVersion({
+        case "2.11.0" => Seq("org.scala-lang" % "scala-parser-combinators" % "2.11.0-M4")
+        case _ => Seq()
+      })
     )
 
 lazy val `tsu-argonaut` =
@@ -45,7 +51,7 @@ lazy val `tsu-argonaut` =
     .settings(
       version := "1-SNAPSHOT",
       libraryDependencies ++= Seq(
-        "io.argonaut" %% "argonaut" % "6.0.3"
+        "io.argonaut" %% "argonaut" % "6.0.4"
       )
     )
 
@@ -56,7 +62,7 @@ lazy val `tsu-spray` =
     .settings(
       version := "1-SNAPSHOT",
       libraryDependencies ++= Seq(
-        "io.spray" %% "spray-json" % "1.2.5"
+        "io.spray" %% "spray-json" % "1.2.6"
       )
     )
 lazy val `tsu-json4s` =
@@ -66,8 +72,8 @@ lazy val `tsu-json4s` =
     .settings(
       version := "1-SNAPSHOT",
       libraryDependencies ++= Seq(
-        "org.json4s" %% "json4s-ast" % "3.2.7",
-        "org.json4s" %% "json4s-core" % "3.2.7"
+        "org.json4s" %% "json4s-ast" % "3.2.10",
+        "org.json4s" %% "json4s-core" % "3.2.10"
       )
     )
 
