@@ -4,13 +4,19 @@ import scala.io.Source
 import com.fasterxml.jackson.core.{JsonToken, JsonFactory, JsonParser}
 
 package object jackson {
+  private val factory = new JsonFactory
   def parse(source: Source): Stream[JsonValue] = {
     parse(new SourceReader(source))
   }
 
   def parse(is: java.io.Reader): Stream[JsonValue] = {
-    val parser: JsonParser = new JsonFactory().createParser(is)
+    val parser: JsonParser = factory.createParser(is)
     parser.disable(JsonParser.Feature.AUTO_CLOSE_SOURCE)
+
+    parse(parser)
+  }
+
+  private def parse(parser: JsonParser): Stream[JsonValue] = {
 
     def parseJsonValue(token: => JsonToken): JsonValue = {
       token match {
@@ -57,7 +63,10 @@ package object jackson {
     }
 
     try {
-      Option(parser.nextToken).map(t => Next(parseJsonValue(t), parse(is))).getOrElse(End)
+      Option(parser.nextToken).map(t => {
+        lazy val v = parseJsonValue(t)
+        Next(v, { traverse(v); parse(parser) })
+      }).getOrElse(End)
     } catch {
       case e: Exception => ErrorWithThrowable(e)
     }
@@ -73,16 +82,20 @@ package object jackson {
     def close = source.close
 
     def read(buf: Array[Char], offset: Int, len: Int): Int = {
-      scala.collection.immutable.Stream.range(offset, offset + len)
-      .map((idx: Int) => {
-        if(source.hasNext)
-          (idx, Some(source.next))
-        else
-          (idx, None)
-      })
-      .foldLeft(0)((len: Int, last: (Int, Option[Char])) => {
-        last._2.map(buf.update(last._1, _)).map(_ => len + 1).getOrElse(len)
-      })
+      if(!source.hasNext) {
+        -1
+      } else {
+        scala.collection.immutable.Stream.range(offset, offset + len)
+        .map((idx: Int) => {
+          if(source.hasNext)
+            (idx, Some(source.next))
+          else
+            (idx, None)
+        })
+        .foldLeft(0)((len: Int, last: (Int, Option[Char])) => {
+          last._2.map(buf.update(last._1, _)).map(_ => len + 1).getOrElse(len)
+        })
+      }
     }
   }
 
