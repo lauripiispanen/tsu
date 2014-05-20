@@ -10,6 +10,7 @@ package object jackson {
 
   def parse(is: java.io.Reader): Stream[JsonValue] = {
     val parser: JsonParser = new JsonFactory().createParser(is)
+    parser.disable(JsonParser.Feature.AUTO_CLOSE_SOURCE)
 
     def parseJsonValue(token: => JsonToken): JsonValue = {
       token match {
@@ -37,7 +38,7 @@ package object jackson {
           case t => throw new IllegalStateException(t.toString)
         }
       } catch {
-        case e: Exception => Error(e.getMessage)
+        case e: Exception => ErrorWithThrowable(e)
       }
     }
 
@@ -51,11 +52,15 @@ package object jackson {
           }
         }
       } catch {
-        case e: Exception => Error(e.getMessage)
+        case e: Exception => ErrorWithThrowable(e)
       }
     }
 
-    Next(parseJsonValue(parser.nextToken), parse(is))
+    try {
+      Option(parser.nextToken).map(t => Next(parseJsonValue(t), parse(is))).getOrElse(End)
+    } catch {
+      case e: Exception => ErrorWithThrowable(e)
+    }
   }
 
   private def traverse(v: JsonValue): Unit = v match {

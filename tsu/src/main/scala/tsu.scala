@@ -21,7 +21,10 @@ package object tsu {
 
   sealed abstract class Stream[+A] {
 
-    class ErrorInStreamException(msg: String) extends Exception(msg)
+    class ErrorInStreamException(msg: String, t: Throwable) extends Exception(msg, t) {
+      def this(msg: String) = this(msg, null)
+      def this(e: Throwable) = this(null, e)
+    }
 
     def toSeq: scala.collection.immutable.Stream[A] = {
       import scala.collection.immutable.Stream.{Cons, Empty}
@@ -39,6 +42,7 @@ package object tsu {
           f(value)
           (true, rest)
         }
+        case ErrorWithThrowable(e) => throw new ErrorInStreamException(e)
         case Error(message) => throw new ErrorInStreamException(message)
         case s => (false, s)
       }

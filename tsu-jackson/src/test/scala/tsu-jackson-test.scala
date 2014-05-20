@@ -11,4 +11,9 @@ class JacksonTest extends FlatSpec with Matchers {
     val value = parse(Source.fromInputStream(inputStream, "UTF-8"))
     value.map(_.asInstanceOf[JsonArray]).flatMap(_.elements).take(2).foreach(println)
   }
+  "Parser" should "parse adjoined objects" in {
+    val inputStream: InputStream = getClass.getResourceAsStream("/adjoined.jsonstream")
+    val value = parse(Source.fromInputStream(inputStream, "UTF-8"))
+    value.foreach(println)
+  }
 }
